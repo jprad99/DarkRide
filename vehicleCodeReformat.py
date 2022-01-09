@@ -18,7 +18,6 @@
 ################################################
 ###############Settings!!!!!!###################
 ################################################
-vehicle = 1
 # Choose the serial port name.
 # Linux USB example:  "/dev/ttyACM0"  (see also: /dev/serial/by-id)
 # macOS USB example:  "/dev/cu.usbmodem001234562"
@@ -61,6 +60,8 @@ global enableMotor  # local version of the estop parameter, for holding
 global stopped  # is the vehicle stopped, EXPERIMENT
 global currentBlock  # current location in the blocking system of the vehicle
 global speed
+
+vehicle = 1
 
 ################################################
 ##################Pre-Startup###################
@@ -356,6 +357,9 @@ def localeStop(hold):
     if (hold == True) and (enableMotor == True):
         try:
             cur.execute("UPDATE vehicles SET MotorEnable = %s WHERE vehicleID = %d" %(0,int(vehicle)))
+        except:
+            print('An Error Occured')
+            shutdown()
         smc.stop_motor()
         status = "'LOCAL ESTOP'"
         enableMotor = False
@@ -363,6 +367,9 @@ def localeStop(hold):
     elif (hold == False) and (enableMotor == False):
         try:
             cur.execute("UPDATE vehicles SET MotorEnable = %s WHERE vehicleID = %d" %(1,int(vehicle)))
+        except:
+            print('An Error Occured')
+            shutdown()
         smc.exit_safe_start()
         status = "'running'"
         enableMotor = True
