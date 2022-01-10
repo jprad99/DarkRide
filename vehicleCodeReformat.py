@@ -22,7 +22,7 @@
 # Linux USB example:  "/dev/ttyACM0"  (see also: /dev/serial/by-id)
 # macOS USB example:  "/dev/cu.usbmodem001234562"
 # Windows example:    "COM6"
-port_name = "/dev/ttyACM0"
+smc_port = "/dev/ttyACM0"
 baud_rate = 9600  # Standard for SMC G2
 device_number = None  # Typically not used, here for future
 db_address = "192.168.1.152" # Where the MariaDB is!
@@ -119,8 +119,7 @@ class SmcG2Serial(object):  # define functions of the Pololu SMC G2
         cmd = 0x85  # Motor forward
         if speed < 0:
             cmd = 0x86  # Motor reverse
-            speed = -speed
-        self.send_command(cmd, int(speed) & 0x1F, int(speed) >> 5 & 0x7F)
+        self.send_command(cmd, int(abs(speed)) & 0x1F, int(speed) >> 5 & 0x7F)
 
     # Gets the specified variable as an unsigned value.
     def get_variable(self, id):
@@ -186,6 +185,7 @@ class virtualSMC(
         enableMotor = False
 
 
+'''
 class shutdownWatchdog:
     # basic watchdog to detect if the machine is shutting down, and ensure that
     # the code can send final pings to the database informing it that the vehicle
@@ -202,8 +202,7 @@ class shutdownWatchdog:
         print(frame)
         time.sleep(5)
         shutdown()
-
-
+'''
 def rideStart():
     global status
     global vehicle
@@ -216,26 +215,23 @@ def rideStart():
         if runWithoutSMC == True:
             smc = virtualSMC()
         else:
-            port = serial.Serial(port_name, baud_rate, timeout=0.1, write_timeout=0.1)
+            port = serial.Serial(smc_port, baud_rate, timeout=0.1, write_timeout=0.1)
             smc = SmcG2Serial(port, device_number)
     except Exception as E:
         print(
             "SMC Controller Not Found on Port "
-            + port_name
+            + smc_port
             + "\nPlease Check Connection"
         )
         print()
         print("System Error Message:")
         print(E)
         print()
-        status = "SMC ERROR"
-        updateStatus()
+        updateStatus("SMC Error")
         quit()
     # enable the motor
     smc.exit_safe_start()
-
-    status = "initializing"
-    updateStatus()
+    updateStatus("Initializing")
     print(logo)
     print("Initializing")
     cur.execute("SELECT location FROM vehicles WHERE vehicleID = %s" % (vehicle))
@@ -254,8 +250,7 @@ def rideStart():
     setSpeed(speed)
     getIP()
     print("Finished with startup")
-    status = "READY"
-    updateStatus()
+    updateStatus("READY")
 
 
 def ping(IP):
@@ -263,8 +258,7 @@ def ping(IP):
     return response
 
 
-def updateStatus():
-    global status
+def updateStatus(status):
     cur.execute("UPDATE vehicles SET Status = %s WHERE vehicleID=%d" %((status),int(vehicle)))
     conn.commit()
 #Create a function for checking if the new block is free
@@ -319,8 +313,7 @@ def hold(hold):
     global resumeSpeed
     if speed != 0:
         resumeSpeed = speed
-    status = "'holding'"
-    #print(f'Hold {hold}')
+    updateStatus("Holding")
     if hold == True:
         if enableMotor == True:
             setSpeed(0)
@@ -328,7 +321,7 @@ def hold(hold):
     elif hold == False:
         if enableMotor == False:
             setSpeed(resumeSpeed)
-            status = "'running'"
+            updateStatus("Running")
             enableMotor = True
     conn.commit()
 
@@ -401,7 +394,7 @@ def advanceBlock(block):
         else:
             hold(False)
             break
-
+''' REMOVED TO MAKE SINGLE THREAD
 def serverComms():
     while True:
         global vehicle
@@ -424,7 +417,7 @@ def serverComms():
         elif qtyStops == 0 and stopped == True:
             stopped = False
         time.sleep(1)
-
+'''
 def shutdown():
     global status
     eStop(True)
@@ -447,17 +440,6 @@ def scanner(command):
         cmdType = command[0]
         cmdVal = int(command[1])
         if cmdType.lower() == 'block': # command to check if the next block is available
-            '''
-            while True:
-                advance = nextBlockClear(cmdVal)
-                if advance == 0: # the next block is not clear
-                    print('waiting')
-                    hold(True)
-                    time.sleep(1)
-                else:
-                    hold(False)
-                    break
-            '''
             advanceBlock(cmdVal) # replaces above code with a function that can be utilized elsewhere!
         elif cmdType.lower() == 'speed': # command to change speed
             print('Setting Speed')
