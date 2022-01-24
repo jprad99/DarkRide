@@ -25,7 +25,7 @@
 smc_port = "/dev/ttyACM0"
 baud_rate = 9600  # Standard for SMC G2
 device_number = None  # Typically not used, here for future
-db_address = "192.168.1.152" # Where the MariaDB is!
+db_address = "darkrideserver" # Where the MariaDB is!
 
 
 ################################################
@@ -74,11 +74,11 @@ logo = pyfiglet.figlet_format("  Modular\nDark Ride", font="slant")
 ################################################
 try:
     conn = mariadb.connect(
-        user="python",
-        password="python",
+        user="remote",
+        password="remote",
         host=db_address,
-        port=5557,
-        database="darkride",
+        port=3306,
+        database="DarkRide",
     )
     print("Connection Successful")
 
@@ -154,9 +154,7 @@ class SmcG2Serial(object):  # define functions of the Pololu SMC G2
         enableMotor = False
 
 
-class virtualSMC(
-    object
-):  # Create a virtual version of the SMC for testing without motor control
+class virtualSMC(object):  # Create a virtual version of the SMC for testing without motor control
     def __init__(self):
         print("virtualSMC initiated")
         global enableMotor
@@ -334,12 +332,12 @@ def eStop(hold):
     if (hold == True) and (enableMotor == True):
         #cur.execute("UPDATE vehicles SET MotorEnable = %s WHERE vehicleID = %d" %(0,int(vehicle)))
         smc.stop_motor()
-        status = "'GLOBAL ESTOP'"
+        updateStatus("Global ESTOP")
         enableMotor = False
     elif (hold == False) and (enableMotor == False):
         #cur.execute("UPDATE vehicles SET MotorEnable = %s WHERE vehicleID = %d" %(1,int(vehicle)))
         smc.exit_safe_start()
-        status = "'running'"
+        updateStatus("Running")
         enableMotor = True
 
 def localeStop(hold):
@@ -421,8 +419,7 @@ def serverComms():
 def shutdown():
     global status
     eStop(True)
-    status = "'offline'"
-    updateStatus()
+    updateStatus("OFFLINE")
     print('Shutting down')
     conn.close()
     exit()  
@@ -463,9 +460,9 @@ def enqueue_output(out, queue):
     for line in iter(out.readline, b''):
         queue.put(line)
     out.close()
-p = Popen(stdout=PIPE, bufsize=1, close_fds=ON_POSIX)
-q = Queue()
-t = Thread(target=enqueue_output, args=(p.stdout, q))
+#p = Popen(['DarkRide.exe'],stdout=PIPE, bufsize=1, close_fds=ON_POSIX)
+input_queue = Queue()
+t = Thread(target=enqueue_output, args=(input_queue))
 t.daemon = True # thread dies with the program
 t.start()
 

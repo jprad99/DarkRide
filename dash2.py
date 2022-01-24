@@ -12,11 +12,11 @@ import mariadb
 
 try:
     conn = mariadb.connect(
-        user="python",
-        password="python",
-        host="192.168.1.152",
-        port=5557,
-        database="darkride"
+        user="remote",
+        password="remote",
+        host="darkrideserver",
+        port=3306,
+        database="DarkRide"
     )
     print("Connection Successful")
 except mariadb.Error as e:

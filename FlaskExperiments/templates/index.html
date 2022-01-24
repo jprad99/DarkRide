@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+
+{% block form %}
+<form action="/submit" method = "POST" autocomplete="off">
+    <p><input type = "text" name = "Command" size = 50>
+    <input type = "submit" value = "Execute"></p>
+</form>
+{% endblock %}
