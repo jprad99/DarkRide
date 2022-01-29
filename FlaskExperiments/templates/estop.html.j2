@@ -1,6 +1,10 @@
-<div id="estop">
-    {{ COLOR }}
-    <span style="height: 300px; width: 300px; background-color: rgb({{COLOR}}); border-radius: 50%; display: inline-block"></span>
-    <span style="height: 25px; width: 25px; background-color: rgb(51, 255, 0); border-radius: 50%; display: inline-block"></span>
-    <span style="height: 25px; width: 25px; background-color: rgb(0, 0, 0); border-radius: 50%; display: inline-block"></span>
+<div class="estopcontainer", id="estop">
+    <div class="estoplabel">
+        <div class="estopcircle" style = "background-color:rgb({{localestop}});"></div>
+        <p>LOCAL ESTOP</p>
+    </div>
+    <div class="estoplabel">
+        <div class="estopcircle" style = "background-color:rgb({{networkestop}});"></div>
+        <p>NETWORK ESTOP</p>
+    </div>
 </div>

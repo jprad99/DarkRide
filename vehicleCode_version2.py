@@ -13,7 +13,7 @@
 #   |___/ \__,_|_|  |_|\_\ \_| \_|_|\__,_|\___|
 #
 #   Created by James Radko
-#   Version 2.1.3
+#   Version 2.2.1
 
 smc_port = "/dev/ttyACM0"
 baud_rate = 9600  # Standard for SMC G2
@@ -25,13 +25,15 @@ runWithoutSMC = True
 # IMPORTS
 import socket  # to retrieve IP Address
 import signal  # to process SIGTERM and other OS Signals for clean shutdown
-import os  # prereq
+import os
+from sqlite3 import InterfaceError  # prereq
 import sys  # prereq
 import pyfiglet  # create logo at beginning of terminal, purely cosmetic
 import time  # for sleep
 import mariadb  # database connector
 import threading  # run background processes to check ESTOP and other
 from multiprocessing import Process, set_forkserver_preload
+import subprocess
 from subprocess import PIPE, Popen
 from threading import Thread
 import re  # regular expression
@@ -39,6 +41,8 @@ import serial  # For comms with the SMC G2 via USB/Serial
 from queue import Queue, Empty
 import asyncio
 import aioconsole
+import platform
+import time
 
 # CREATE ASCII LOGO FOR TERMINAL
 logo = pyfiglet.figlet_format("  Modular\nDark Ride", font="slant")
@@ -189,7 +193,7 @@ class vehicle(object):
         # TELL DATABASE OUR IP
         import socket
         hostname = socket.getfqdn()
-        ipAddress = socket.gethostbyname_ex(hostname)[2][1]
+        ipAddress = socket.gethostbyname_ex(hostname)[2][0]
         print(ipAddress)
         cur.execute("UPDATE vehicles SET IP = %s WHERE vehicleID=%d" %(("'"+ipAddress+"'"),int(self.vehicleID)))
         conn.commit()
@@ -208,16 +212,31 @@ class vehicle(object):
         self.speed = rawSpeed // 32
         conn.commit()
 
+        # Put vehicle into an ESTOP to wait for the all clear
+        self.estop(True,"Waiting For Start!")
+        self.checkStops()
+
     # HANDLE ESTOP COMMANDS
     def estop(self, estop, cause="ESTOP"):
+        self.localStop = estop
         if estop == True:
             smc.stop_motor()
-            self.updateStatus(cause)
+            try:
+                self.updateStatus(cause)
+            except:
+                pass
         elif estop == False:
             smc.exit_safe_start()
-            self.updateStatus("Resume From ESTOP")
-        cur.execute("UPDATE vehicles SET estop = %s WHERE vehicleID = %d" %(estop,int(self.vehicleID)))
-        conn.commit()
+            try:
+                self.updateStatus("Resume From ESTOP")
+            except:
+                pass
+        try:
+            cur.execute("UPDATE vehicles SET estop = %s WHERE vehicleID = %d" %(estop,int(self.vehicleID)))
+            conn.commit()
+        except:
+            print('Unable to reach the server! Vehicle will be in safe stop violation!')
+            smc.stop_motor()
 
     # HOLD POSITION (BUT NOT ESTOP)
     def hold(self, hold, dur = None, resumeSpeed = 10):
@@ -231,7 +250,7 @@ class vehicle(object):
         if dur is not None:
             time.sleep(dur)
             self.setSpeed(resumeSpeed)
-            self.updateStatus("Resumed From Timed Hold")
+            self.updateStatus(f'Resumed From Timed {dur}s Hold')
 
     def updateStatus(self, status):
         cur.execute("UPDATE vehicles SET Status = %s WHERE vehicleID=%d" %(("'"+str(status)+"'"),int(self.vehicleID)))
@@ -247,7 +266,7 @@ class vehicle(object):
         else:
             print(f'Improper Speed of {speedPercent}%')
             print('Activating ESTOP')
-            self.estop(True)
+            self.estop(True,'Speed Input Error')
     
     # CHECK NEXT BLOCK
     def nextBlockClear(self, newBlock):
@@ -279,6 +298,25 @@ class vehicle(object):
         if blockHeld == True:
             self.hold(False)
     # RECEIVE INPUT AND PROCESS IT
+    def checkStops(self):
+        cur.execute("SELECT estop FROM vehicles WHERE NOT (vehicleID =%d)" %(int(self.vehicleID)))
+        res = cur.fetchall()
+        remoteStops = []
+        for i in range(len(res)):
+            remoteStops.append(res[i][0])
+        conn.commit()
+        #print(remoteStops)
+        if 1 in remoteStops:
+            self.networkStop = True
+        else:
+            self.networkStop = False
+        return self.networkStop
+
+
+    def updateTime(self):
+        cur_time = time.strftime("%H:%M:%S", time.localtime())
+        cur.execute("UPDATE vehicles SET Time = %s WHERE vehicleID=%d" %(("'"+str(cur_time)+"'"),int(self.vehicleID)))
+        conn.commit()
     def handleCommand(self, cmd):
         cmd = cmd.split()
         cmd = list(filter(None,cmd))
@@ -286,6 +324,8 @@ class vehicle(object):
             pass
         elif cmd[0] == 'shutdown':
             self.shutdown()
+        elif cmd[0] == 'c':
+            self.checkStops()
         elif len(cmd) == 2:
             cmdType = cmd[0]
             cmdVal = int(cmd[1])
@@ -301,11 +341,15 @@ class vehicle(object):
                     self.estop(True, 'Scan')
                 if cmdVal == 0:
                     self.estop(False)
+            elif cmdType.lower() == 'resume':
+                print('Resuming From Scan')
+                self.estop(False, 'Scanned Out of ESTOP')
+                self.setSpeed(cmdVal)
             else:
                 print("Unrecognized command")
         else:
             print('Improper command format')
-            self.estop(True,'Scan Error')
+            self.estop(True,'Scan Format Error')
 
     # SHUTDOWN PROCEDURE
     def shutdown(self):
@@ -315,19 +359,47 @@ class vehicle(object):
 
 def vehicleLoop():
     global ride
+    global cur
+    networkStop = False
     while True:
         try:
-            cmd = q.get_nowait()
-            ride.handleCommand(cmd)
-            q.task_done()
-        except Empty:
-            pass
+            #print(f'local: {ride.localStop}  network: {ride.networkStop}')
+            if ride.checkStops(): # Should be estopped
+                smc.stop_motor()
+                ride.updateStatus('Network ESTOP')
+                networkStop = True
+            else: # can exit estop if local estop is clear
+                if (networkStop == True) and (ride.localStop == False):
+                    networkStop = False
+                    smc.exit_safe_start()
+                    ride.updateStatus('Resume from Network ESTOP')
+            try:
+                cmd = q.get_nowait()
+                ride.handleCommand(cmd)
+                q.task_done()
+            except Empty:
+                try:
+                    time.sleep(0.5)
+                    ride.updateTime()
+                except mariadb.Error as e:
+                    print(f'encountered error with database: {e}')
+                    ride.estop(True, 'Database Error')
+        except mariadb.Error as e:
+            print(f'encountered error with database: {e}')
+            print('For safety, activating estop')
+            ride.estop(True, 'Database Error')
+            time.sleep(10)
+        except mariadb.InterfaceError as e:
+            print(f'Error: {e}')
+            print(f'Vehicle in Standby ESTOP')
         #print('LOOPED')
+
 
 def main():
     global ride
     ride = vehicle(1)
     print(ride.speed)
+    time.sleep(3)
     global q
     global t
     q = Queue()
@@ -338,5 +410,15 @@ def main():
     while True:
         lineIn = input("Enter Command: ")
         q.put(lineIn)
+
+def ping(host):
+    '''
+    Return TRUE if the server is reachable and
+    FALSE if the server is currently unreachable
+    '''
+
+    param = '-n' if platform.system().lower()=='windows' else '-c'
+    command = ['ping', param, '1', host]
+    return subprocess.call(command) == 0
 
 main()
