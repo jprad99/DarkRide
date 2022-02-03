@@ -363,7 +363,10 @@ def vehicleLoop():
     networkStop = False
     while True:
         try:
-            #print(f'local: {ride.localStop}  network: {ride.networkStop}')
+            try:
+                conn.ping()
+            except mariadb.DatabaseError:
+                conn.reconnect()
             if ride.checkStops(): # Should be estopped
                 smc.stop_motor()
                 ride.updateStatus('Network ESTOP')
@@ -384,14 +387,11 @@ def vehicleLoop():
                 except mariadb.Error as e:
                     print(f'encountered error with database: {e}')
                     ride.estop(True, 'Database Error')
-        except mariadb.Error as e:
+        except mariadb.Error as e: # Catches almost all mariadb errors
             print(f'encountered error with database: {e}')
             print('For safety, activating estop')
             ride.estop(True, 'Database Error')
             time.sleep(10)
-        except mariadb.InterfaceError as e:
-            print(f'Error: {e}')
-            print(f'Vehicle in Standby ESTOP')
         #print('LOOPED')
 
 
@@ -410,15 +410,5 @@ def main():
     while True:
         lineIn = input("Enter Command: ")
         q.put(lineIn)
-
-def ping(host):
-    '''
-    Return TRUE if the server is reachable and
-    FALSE if the server is currently unreachable
-    '''
-
-    param = '-n' if platform.system().lower()=='windows' else '-c'
-    command = ['ping', param, '1', host]
-    return subprocess.call(command) == 0
 
 main()

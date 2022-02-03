@@ -1,0 +1,11 @@
+{% extends "base.html.j2" %}
+
+{% block form %}
+<form action="/submit" method = "POST" autocomplete="off">
+    <p><input type = "text" name = "Command" size = 50>
+    <input type = "submit" value = "Execute"></p>
+</form>
+{% endblock %}
+{% block title %}
+<h1>Dark Ride Control Panel</h1>
+{%endblock%}

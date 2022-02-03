@@ -1,6 +1,9 @@
 <div class="estopcontainer", id="estop">
     <div class="estoplabel">
-        <div class="estopcircle" style = "background-color:rgb({{localestop}});"></div>
+        <form action="/submit" method = "POST" autocomplete="off">
+        <input type = "hidden" name = "ESTOP" value = "toggle" />
+        <button name="FRED" value="hello" class="estopcircle" style = "background-color:rgb({{localestop}});"></button>
+        </form>
         <p>LOCAL ESTOP</p>
     </div>
     <div class="estoplabel">

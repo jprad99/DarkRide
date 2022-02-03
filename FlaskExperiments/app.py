@@ -52,11 +52,23 @@ def index():
 
 @app.route('/submit/', methods = ['POST', 'GET'])
 def data():
+    global estop
     if request.method == 'GET':
         return f"The URL /data is only used to post data"
     if request.method == 'POST':
-        command = request.form['Command']
-        loopQ.put(command)
+        try:
+            command = request.form.get('Command')
+            print(command)
+            if command is not None:
+                loopQ.put(command)
+            else:
+                print('No command')
+            res = request.form.get('ESTOP')
+            print(res)
+            if res.lower() == 'toggle':
+                estop = not estop
+        except:
+            print('AHHHH')
         return redirect(url_for('index'))
 
 @app.before_first_request

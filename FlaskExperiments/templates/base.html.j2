@@ -1,0 +1,72 @@
+
+
+<!doctype html>
+<html>
+   <head>
+      <title>Dark Ride</title>
+      <style>
+         .load table {
+         float: center;
+         font-family: arial, sans-serif;
+         border-collapse: collapse;
+         margin: auto;
+         width: 70%;
+         }
+         .load th, .load td {
+         border: 1px solid #dddddd;
+         text-align: center;
+         padding: 8px;
+         }
+         .load tr:nth-child(even) {
+         background-color: #dddddd;
+         }
+         input {
+         width: 70%;
+         }
+         form {
+         float: center;
+         text-align: center;
+         margin: auto;
+         }
+         h1{
+         float: center;
+         width: 80%;
+         background-color:  #005e87;
+         color: white;
+         text-align: center;
+         margin: auto;
+         }
+         .estopcontainer {
+         width:70%;
+         float:center;
+         margin: auto;
+         background-color:#FBD603;
+         max-height:10px;
+         }
+         .estoplabel {
+         width:50%;
+         text-align:center;
+         float:left;
+         }
+         .estopcircle {
+         display:inline-block;
+         width: 75px;
+         height: 75px;
+         border-radius:50%;
+         }
+         .estoplabel p {
+         font-size:16px;
+         color:#666;
+         }
+         }
+      </style>
+      {{ turbo() }}
+   </head>
+   <body>
+      {% block title%}{%endblock%}
+      {% include "ridetable.html.j2" %}
+      {% block form %}{%endblock%}
+      {% include "estop.html.j2" %}
+   </body>
+</html>
+

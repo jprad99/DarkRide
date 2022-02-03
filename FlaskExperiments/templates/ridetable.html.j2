@@ -1,0 +1,18 @@
+<div id="load" class="load">
+    <table>
+      <tr>
+      {%for parameter in SQLData %}
+      <th>{{parameter}}</th>
+      {%endfor%}
+      </tr>
+      {%for ID in SQLData['VehicleID']%} {# hardcoded until I can figure it out #}
+      <tr>
+      {%for parameter in SQLData%}
+        <td>
+          {{SQLData[parameter][ID]}}
+        </td>
+      {%endfor%}
+      </tr>
+      {%endfor%}
+    </table>
+</div>
